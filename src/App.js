@@ -1,6 +1,6 @@
-import './App.css';
-import styled from 'styled-components';
-import { useState, useMemo } from "react";
+import "./App.css";
+import styled from "styled-components";
+import { useReducer, useEffect } from "react";
 
 const Header = styled.header`
   width: 100%;
@@ -12,17 +12,9 @@ const Header = styled.header`
 
 const SearchInput = styled.input`
   width: 300px;
-  padding: 10px 14px;
+  padding: 10px;
   border-radius: 20px;
   border: none;
-  outline: none;
-  font-size: 16px;
-`;
-
-const AppWrapper = styled.div`
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 20px;
 `;
 
 const Gallery = styled.ul`
@@ -30,98 +22,80 @@ const Gallery = styled.ul`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 20px;
-  padding: 0;
-  margin: 0 0 30px;
-`;
-
-const GalleryItem = styled.li`
-  background: #f4f4f4;
-  border-radius: 10px;
-  overflow: hidden;
-  cursor: pointer;
-  transition: transform 0.2s ease;
-
-  &:hover {
-    transform: scale(1.03);
-  }
-
-  img {
-    width: 100%;
-    height: 200px;
-    object-fit: cover;
-    display: block;
-  }
+  padding: 20px;
 `;
 
 const LoadMoreBtn = styled.button`
-  display: block;
   margin: 0 auto;
-  padding: 12px 24px;
-  border-radius: 8px;
-  border: none;
-  background: #007aff;
-  color: #fff;
-  font-size: 16px;
-  cursor: pointer;
-
-  &:hover {
-    background: #005ad1;
-  }
+  display: block;
+  padding: 10px 20px;
 `;
+const initialState = {
+  images: [],
+  query: "",
+  count: 16,
+};
 
-function App() {
-  const [images, setImages] = useState([]);
-  const [query, setQuery] = useState("");
-  const [count, setCount] = useState(16);
+function reducer(state, action) {
+  switch (action.type) {
+    case "SEARCH":
+      return { ...state, query: action.payload, count: 16 };
+    case "SET_IMAGES":
+      return { ...state, images: action.payload };
+    case "LOAD_MORE":
+      return { ...state, count: state.count + 16 };
+    default:
+      return state;
+  }
+}
 
-  const fetchImages = (q, perPage) => {
+function useImages(query, count, dispatch) {
+  useEffect(() => {
+    if (!query) return;
+
     fetch(
-      `https://pixabay.com/api/?key=50978158-2e1c075068d4fb19bda657fd9&q=${q}&image_type=photo&orientation=horizontal&per_page=${perPage}`
+      `https://pixabay.com/api/?key=50978158-2e1c075068d4fb19bda657fd9&q=${query}&per_page=${count}`
     )
       .then(res => res.json())
-      .then(data => setImages(data.hits));
-  };
+      .then(data =>
+        dispatch({ type: "SET_IMAGES", payload: data.hits })
+      );
+  }, [query, count, dispatch]);
+}
 
-  const handleSearch = (e) => {
-    const value = e.target.value;
-    setQuery(value);
-    setCount(16);
-    fetchImages(value, 16);
-  };
+export default function App() {
+  const [state, dispatch] = useReducer(reducer, initialState);
+  const { images, query, count } = state;
 
-  const handleLoadMore = () => {
-    const newCount = count + 16;
-    setCount(newCount);
-    fetchImages(query, newCount);
-  };
-
-  const imagesToShow = useMemo(() => images, [images]);
+  useImages(query, count, dispatch);
 
   return (
     <>
       <Header>
         <SearchInput
-          placeholder="Search images..."
+          placeholder="Search..."
           value={query}
-          onChange={handleSearch}
+          onChange={(e) =>
+            dispatch({ type: "SEARCH", payload: e.target.value })
+          }
         />
       </Header>
 
-      <AppWrapper>
-        <Gallery>
-          {imagesToShow.map(img => (
-            <GalleryItem key={img.id}>
-              <img src={img.largeImageURL} alt={img.tags} />
-            </GalleryItem>
-          ))}
-        </Gallery>
+      <Gallery>
+        {images.map(img => (
+          <li key={img.id}>
+            <img src={img.previewURL} alt="" />
+          </li>
+        ))}
+      </Gallery>
 
-        {imagesToShow.length > 0 && (
-          <LoadMoreBtn onClick={handleLoadMore}>Load more</LoadMoreBtn>
-        )}
-      </AppWrapper>
+      {images.length > 0 && (
+        <LoadMoreBtn
+          onClick={() => dispatch({ type: "LOAD_MORE" })}
+        >
+          Load more
+        </LoadMoreBtn>
+      )}
     </>
   );
 }
-
-export default App;
